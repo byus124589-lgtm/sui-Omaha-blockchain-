@@ -1,0 +1,78 @@
+diff --git a/brassaia-eio/lib_brassaia_pack/io/io.ml b/brassaia-eio/lib_brassaia_pack/io/io.ml
+index b868d9dad7a4a50d7902cd7d57a0d7451fb79cb2..1b95fa53a5132e2c9c5f16a8434195ad0d67e01c 100644
+--- a/brassaia-eio/lib_brassaia_pack/io/io.ml
++++ b/brassaia-eio/lib_brassaia_pack/io/io.ml
+@@ -309,9 +309,18 @@ module Unix = struct
+     let is_darwin =
+       lazy
+         (try
+-           match Unix.open_process_in "uname" |> input_line with
+-           | "Darwin" -> true
+-           | _ -> false
++           let inc = Unix.open_process_in "uname" in
++           let res =
++             match input_line inc with
++             | "Darwin" -> true
++             | _ -> false
++             | exception End_of_file ->
++                 (* Something went wrong but we still need to wait for the child
++                    process *)
++                 false
++           in
++           ignore (Unix.close_process_in inc) ;
++           res
+          with Unix.Unix_error _ -> false)
+ 
+     let get_wtime () =
+diff --git a/brassaia/lib_brassaia_pack/unix/gc_stats.ml b/brassaia/lib_brassaia_pack/unix/gc_stats.ml
+index b056ba5de554a5ad4ec864408bccafce13e63384..b7c6729dca463f511d105a39cee697c13708c99a 100644
+--- a/brassaia/lib_brassaia_pack/unix/gc_stats.ml
++++ b/brassaia/lib_brassaia_pack/unix/gc_stats.ml
+@@ -113,9 +113,18 @@ module Worker = struct
+   let is_darwin =
+     lazy
+       (try
+-         match Unix.open_process_in "uname" |> input_line with
+-         | "Darwin" -> true
+-         | _ -> false
++         let inc = Unix.open_process_in "uname" in
++         let res =
++           match input_line inc with
++           | "Darwin" -> true
++           | _ -> false
++           | exception End_of_file ->
++               (* Something went wrong but we still need to wait for the child
++                  process *)
++               false
++         in
++         ignore (Unix.close_process_in inc);
++         res
+        with Unix.Unix_error _ -> false)
+ 
+   let get_wtime () =
+diff --git a/irmin/lib_irmin_pack/unix/gc_stats.ml b/irmin/lib_irmin_pack/unix/gc_stats.ml
+index f2bbbd81c90726f35beee025a186f5f5edf391fd..4e778587a52c34fc6066ebbe58b176e731ef6a35 100644
+--- a/irmin/lib_irmin_pack/unix/gc_stats.ml
++++ b/irmin/lib_irmin_pack/unix/gc_stats.ml
+@@ -113,9 +113,18 @@ module Worker = struct
+   let is_darwin =
+     lazy
+       (try
+-         match Unix.open_process_in "uname" |> input_line with
+-         | "Darwin" -> true
+-         | _ -> false
++         let inc = Unix.open_process_in "uname" in
++         let res =
++           match input_line inc with
++           | "Darwin" -> true
++           | _ -> false
++           | exception End_of_file ->
++               (* Something went wrong but we still need to wait for the child
++                  process *)
++               false
++         in
++         ignore (Unix.close_process_in inc);
++         res
+        with Unix.Unix_error _ -> false)
+ 
+   let get_wtime () =

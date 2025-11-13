@@ -1,0 +1,325 @@
+diff --git a/scripts/packaging/octez/debian/octez-baker.config b/scripts/packaging/octez/debian/octez-baker.config
+index 2513d48f65e49cb00679e74e3fc57a495d0ca70f..e5410cc1a26911fb32905939623dbe672ea195e7 100755
+--- a/scripts/packaging/octez/debian/octez-baker.config
++++ b/scripts/packaging/octez/debian/octez-baker.config
+@@ -18,6 +18,12 @@ case "$new" in
+ *)
+   echoerr "Upgrade from $new"
+   if [ -e /etc/default/octez-baker ]; then
++    # v22.1 is building an unquoted RUNTIME_OPTS when not using DAL, which breaks when using it with
++
++    # this only replaces the parameters to RUNTIME_OPTS if it is at least two
++    # values separated by a space, and not starting with `"`.
++    sed -i '/^RUNTIME_OPTS=[^"].* .*$/ s/^RUNTIME_OPTS=\(.*\)$/RUNTIME_OPTS="\1"/' /etc/default/octez-baker
++
+     #shellcheck disable=SC1091
+     . /etc/default/octez-baker
+     db_set octez-baker/liquidity-vote "$LQVOTE"
+diff --git a/scripts/packaging/octez/debian/octez-baker.octez-accuser@.service b/scripts/packaging/octez/debian/octez-baker.octez-accuser@.service
+index 53bde9abe77a15fff99e4dcbdfa2fd1f4591fcd5..42bea8b7385f9561da58a650b13b8b1b8a96a509 100644
+--- a/scripts/packaging/octez/debian/octez-baker.octez-accuser@.service
++++ b/scripts/packaging/octez/debian/octez-baker.octez-accuser@.service
+@@ -2,13 +2,21 @@
+ Description=Octez accuser for protocol %i
+ Documentation=https://octez.tezos.com/docs/
+ After=network.target
++PartOf=octez-baker.service
++Conflicts=octez-agnostic-accuser.service
++
+ 
+ [Service]
+ EnvironmentFile=-/etc/default/octez-baker
+ EnvironmentFile=-/etc/default/octez-accuser
++User=tezos
+ WorkingDirectory=~
++
++KillMode=control-group
+ Restart=on-failure
+-User=tezos
++RestartSec=10s
++Slice=octez.slice
++
+ ExecStart=/bin/sh -c "/usr/bin/octez-accuser-%i run $RUNTIME_OPTS"
+ 
+ ExecStartPre=+touch /var/log/tezos/accuser-%i.log
+diff --git a/scripts/packaging/octez/debian/octez-baker.octez-agnostic-accuser.service b/scripts/packaging/octez/debian/octez-baker.octez-agnostic-accuser.service
+index 488353f93ccc07375373603361e6285af6d22bb2..8f8cd0cbed6db8438388db9e96b18463f148230c 100644
+--- a/scripts/packaging/octez/debian/octez-baker.octez-agnostic-accuser.service
++++ b/scripts/packaging/octez/debian/octez-baker.octez-agnostic-accuser.service
+@@ -2,13 +2,18 @@
+ Description=Octez accuser service
+ Documentation=https://octez.tezos.com/docs/
+ After=network.target
++PartOf=octez-baker.service
+ 
+ [Service]
+ EnvironmentFile=-/etc/default/octez-baker
+ EnvironmentFile=-/etc/default/octez-accuser
++User=tezos
+ WorkingDirectory=~
++KillMode=control-group
+ Restart=on-failure
+-User=tezos
++RestartSec=10s
++Slice=octez.slice
++
+ ExecStart=/bin/sh -c "/usr/bin/octez-accuser run $RUNTIME_OPTS"
+ 
+ ExecStartPre=+touch /var/log/tezos/accuser.log
+diff --git a/scripts/packaging/octez/debian/octez-baker.octez-agnostic-baker.service b/scripts/packaging/octez/debian/octez-baker.octez-agnostic-baker.service
+index 6e5ed6c91ee9602e481d1214810dc519238fa384..fddb4388522e9d7aee84581687b50aa5e0f672a0 100644
+--- a/scripts/packaging/octez/debian/octez-baker.octez-agnostic-baker.service
++++ b/scripts/packaging/octez/debian/octez-baker.octez-agnostic-baker.service
+@@ -2,17 +2,21 @@
+ Description=Octez agnostic baker service
+ Documentation=https://octez.tezos.com/docs/
+ After=network.target
++PartOf=octez-baker.service
+ 
+ [Service]
+ Type=simple
++KillMode=control-group
+ Restart=on-failure
++RestartSec=10s
+ TimeoutStartSec=infinity
+ TimeoutStopSec=300
++User=tezos
++WorkingDirectory=~
++Slice=octez.slice
+ 
+ EnvironmentFile=-/etc/default/octez-node
+ EnvironmentFile=-/etc/default/octez-baker
+-WorkingDirectory=~
+-User=tezos
+ 
+ ExecStartPre=+touch /var/log/tezos/baker.log
+ ExecStartPre=+chown tezos:tezos /var/log/tezos/baker.log
+diff --git a/scripts/packaging/octez/debian/octez-baker.service b/scripts/packaging/octez/debian/octez-baker.service
+index 6562dd0263d683460ee6531ec234e7b97cb07efa..9fd57154c7a004cd80fe4dccd6bdd98c1ef5d3c0 100644
+--- a/scripts/packaging/octez/debian/octez-baker.service
++++ b/scripts/packaging/octez/debian/octez-baker.service
+@@ -1,13 +1,11 @@
+ [Unit]
+-Description=Octez baker service
+-After=network.target
++Description=Octez baker umbrella service
++After=network.target octez-node.service
+ 
+ [Service]
+ Type=oneshot
+ RemainAfterExit=yes
+-Restart=on-failure
+-TimeoutStartSec=300
+-TimeoutStopSec=300
++
+ 
+ EnvironmentFile=-/etc/default/octez-node
+ EnvironmentFile=-/etc/default/octez-baker
+diff --git a/scripts/packaging/octez/debian/octez-baker@.service b/scripts/packaging/octez/debian/octez-baker@.service
+index d21b1937f5749066432efcddf2455be672d87ae0..da7aaba7030c9a350ce5aa01d2ef96205ca38e98 100644
+--- a/scripts/packaging/octez/debian/octez-baker@.service
++++ b/scripts/packaging/octez/debian/octez-baker@.service
+@@ -2,14 +2,20 @@
+ Description=Octez baker for protocol %i
+ Documentation=https://octez.tezos.com/docs/
+ After=network.target
++PartOf=octez-baker.service
++Conflicts=octez-agnostic-baker.service
++
+ 
+ [Service]
+ # We use the octez-node default to determine the node's DATADIR
+ EnvironmentFile=-/etc/default/octez-node
+ EnvironmentFile=-/etc/default/octez-baker
++User=tezos
+ WorkingDirectory=~
++KillMode=control-group
+ Restart=on-failure
+-User=tezos
++RestartSec=10s
++Slice=octez.slice
+ 
+ # We wrap the command in /bin/sh to identify the baker associated to $PROTOCOL
+ ExecStart=/bin/sh -c "/usr/bin/octez-baker-%i --base-dir $HOME/.tezos-client run with local node $DATADIR --liquidity-baking-toggle-vote $LQVOTE $RUNTIME_OPTS $BAKING_KEY"
+diff --git a/scripts/packaging/octez/debian/octez-dal-node.service b/scripts/packaging/octez/debian/octez-dal-node.service
+index 7b0c756ed2d0e724debca1fcd79ea9c7e0494c9a..eded3b5a5a337dd00112397d27a0b8825f2a13e9 100644
+--- a/scripts/packaging/octez/debian/octez-dal-node.service
++++ b/scripts/packaging/octez/debian/octez-dal-node.service
+@@ -5,12 +5,15 @@ After=network.target
+ 
+ [Service]
+ EnvironmentFile=-/etc/default/octez-dal-node
++User=tezos
+ WorkingDirectory=~
+ Restart=on-failure
+-User=tezos
++RestartSec=10s
++KillMode=control-group
+ ExecStart=/usr/bin/octez-dal-node run $RUNTIME_OPTS
+ StandardOutput=append:/var/log/tezos/octez-dal-node.log
+ StandardError=inherit
++Slice=octez.slice
+ 
+ [Install]
+ WantedBy=multi-user.target
+diff --git a/scripts/packaging/octez/debian/octez-node.service b/scripts/packaging/octez/debian/octez-node.service
+index f6550b8946de97866f3d9488a3a66871db50f9cb..0087bcc4fd03761ea7567c899e9a343f4a90576b 100644
+--- a/scripts/packaging/octez/debian/octez-node.service
++++ b/scripts/packaging/octez/debian/octez-node.service
+@@ -4,15 +4,18 @@ Documentation=https://tezos.gitlab.io/
+ After=network.target
+ 
+ [Service]
+-TimeoutSec=600s
+ EnvironmentFile=-/etc/default/octez-node
++User=tezos
+ WorkingDirectory=~
+ Restart=on-failure
++RestartSec=10s
++KillMode=control-group
+ TimeoutStartSec=infinity
+-TimeoutSec=1500
+-User=tezos
++TimeoutStopSec=300s
++
+ ExecStartPre=/usr/share/octez-node/octez-node-prestart.sh
+ ExecStart=/usr/bin/octez-node run --data-dir $DATADIR --log-output /var/log/tezos/node.log $RUNTIME_OPTS
++Slice=octez.slice
+ 
+ [Install]
+ WantedBy=multi-user.target
+diff --git a/scripts/packaging/octez/debian/octez-smart-rollup-node.service b/scripts/packaging/octez/debian/octez-smart-rollup-node.service
+index 6e5505f7d5c13b386e8046076ca8007e99b83344..c4cbd638c315cf8583cdb88c958cf3b10df416b7 100644
+--- a/scripts/packaging/octez/debian/octez-smart-rollup-node.service
++++ b/scripts/packaging/octez/debian/octez-smart-rollup-node.service
+@@ -5,9 +5,11 @@ After=network.target octez-node.service
+ 
+ [Service]
+ EnvironmentFile=-/etc/default/octez-smart-rollup-node
++User=tezos
+ WorkingDirectory=~
+ Restart=on-failure
+-User=tezos
++RestartSec=10s
++KillMode=control-group
+ ExecStart=/usr/bin/octez-smart-rollup-node run $RUNTIME_OPTS
+ 
+ ExecStartPre=+touch /var/log/tezos/smart-rollup-node.log
+diff --git a/scripts/packaging/octez/scripts/systemd-octez-bakers.sh b/scripts/packaging/octez/scripts/systemd-octez-bakers.sh
+index b0fafcb8076d95d0f40885908c42562deb761e66..b3a6f41660a1ab5b86cb603b62b996f4f6bd793c 100755
+--- a/scripts/packaging/octez/scripts/systemd-octez-bakers.sh
++++ b/scripts/packaging/octez/scripts/systemd-octez-bakers.sh
+@@ -20,25 +20,23 @@ for file in /usr/bin/octez-baker-P*; do
+       systemctl start octez-dal-node
+     fi
+     if [ "$AGNOSTIC_BAKER" = "true" ]; then
+-      systemctl enable "octez-agnostic-baker"
+       systemctl start "octez-agnostic-baker"
+-      systemctl enable "octez-agnostic-accuser"
+       systemctl start "octez-agnostic-accuser"
++      break
+     else
+-      systemctl enable "octez-baker@$proto"
+       systemctl start "octez-baker@$proto"
+-      systemctl enable "octez-accuser@$proto"
+       systemctl start "octez-accuser@$proto"
+     fi
+ 
+   elif [ "$1" = "stop" ]; then
+-    if [ "$AGNOSTIC_BAKER" = "true" ]; then
+-      systemctl stop "octez-agnostic-baker"
+-      systemctl stop "octez-agnostic-accuser"
+-    else
+-      systemctl stop "octez-baker@$proto"
+-      systemctl stop "octez-accuser@$proto"
+-    fi
++    systemctl stop "octez-baker@$proto" || true
++    systemctl disable "octez-baker@$proto" || true
++    systemctl stop "octez-accuser@$proto" || true
++    systemctl disable "octez-accuser@$proto" || true
++    systemctl stop "octez-agnostic-baker" || true
++    systemctl disable "octez-agnostic-baker" || true
++    systemctl stop "octez-agnostic-accuser" || true
++    systemctl disable "octez-agnostic-accuser" || true
+     if grep -q "\-\-dal-node" /etc/default/octez-baker; then
+       systemctl stop octez-dal-node
+     fi
+diff --git a/scripts/packaging/tests/deb/upgrade-systemd-test.sh b/scripts/packaging/tests/deb/upgrade-systemd-test.sh
+index f4b0261307aedf0f6e9a761340bf0962236b170c..abf7dbe3c65ec15d355db0aaf6c5b10c963c15c3 100755
+--- a/scripts/packaging/tests/deb/upgrade-systemd-test.sh
++++ b/scripts/packaging/tests/deb/upgrade-systemd-test.sh
+@@ -54,6 +54,17 @@ systemctl start octez-node
+ #shellcheck disable=SC2009
+ ps aux | grep octez
+ 
++# --- record baker process count BEFORE upgrade ---
++count_bakers() {
++  # count only real baker binaries under tezos user
++  pgrep -u tezos -f '(^|/)(octez-agnostic-baker|octez-baker-P[[:alnum:]]+)( |$)' | wc -l | tr -d " "
++}
++echo "Listing baker units before upgrade:"
++systemctl list-units --type=service --no-legend | awk '{print $1" "$4}' | grep -E '^octez-(agnostic-)?baker(@|\.service)'
++sleep 3 # give systemd a moment to settle
++BAKER_COUNT_BEFORE="$(count_bakers)"
++echo "BAKER_COUNT_BEFORE=$BAKER_COUNT_BEFORE"
++
+ # [setup baker]
+ PROTOCOL=$(octez-client --protocol PtParisBxoLz list understood protocols | tee | head -1)
+ sudo su tezos -c "octez-client -p $PROTOCOL gen keys baker"
+@@ -91,8 +102,56 @@ systemctl status octez-baker.service
+ 
+ systemctl status octez-baker.service
+ 
++echo "Listing baker units after upgrade:"
++systemctl list-units --type=service --no-legend | awk '{print $1" "$4}' | grep -E '^octez-(agnostic-)?baker(@|\.service)'
++sleep 3
++BAKER_COUNT_AFTER="$(count_bakers)"
++echo "BAKER_COUNT_AFTER=$BAKER_COUNT_AFTER"
++
++if [ "$BAKER_COUNT_BEFORE" -ne "$BAKER_COUNT_AFTER" ]; then
++  echo "ERROR: baker process count changed across upgrade ($BAKER_COUNT_BEFORE -> $BAKER_COUNT_AFTER)"
++  + ERR=1
++else
++  echo "OK: baker process count unchanged ($BAKER_COUNT_AFTER)"
++fi
++
+ ERR=0
+ 
++# --- verify octez-baker binary version matches the installed package (and target, if given) ---
++# Extract "23.1" from: "9aadd15c (...) (Octez 23.1)"
++BAKER_BIN_VER_AFTER="$(
++  /usr/bin/octez-baker --version 2> /dev/null |
++    sed -n 's/.*(Octez \([0-9][0-9.]*\)).*/\1/p' | head -n1
++)"
++# Get dpkg version, trim Debian revision, keep major.minor (e.g., 23.1 from 23.1-1~foo)
++BAKER_PKG_VER_AFTER="$(
++  dpkg-query -W -f='${Version}\n' octez-baker 2> /dev/null |
++    cut -d- -f1 | awk -F. '{print $1"."$2}'
++)"
++echo "octez-baker --version -> ${BAKER_BIN_VER_AFTER}"
++echo "octez-baker (dpkg)   -> ${BAKER_PKG_VER_AFTER}"
++
++if [ -z "${BAKER_BIN_VER_AFTER}" ] || [ -z "${BAKER_PKG_VER_AFTER}" ]; then
++  echo "ERROR: could not determine baker binary/package version after upgrade"
++  ERR=1
++elif [ "${BAKER_BIN_VER_AFTER}" != "${BAKER_PKG_VER_AFTER}" ]; then
++  echo "ERROR: baker binary version (${BAKER_BIN_VER_AFTER}) != package version (${BAKER_PKG_VER_AFTER})"
++  ERR=1
++else
++  echo "OK: baker binary version matches package version (${BAKER_BIN_VER_AFTER})"
++fi
++
++# Optional: enforce a target prefix (e.g., 23.1) if provided by CI
++if [ -n "${TARGET_VER_PREFIX:-}" ]; then
++  case "${BAKER_BIN_VER_AFTER}" in
++  ${TARGET_VER_PREFIX}*) echo "OK: baker binary matches TARGET_VER_PREFIX=${TARGET_VER_PREFIX}" ;;
++  *)
++    echo "ERROR: baker binary version (${BAKER_BIN_VER_AFTER}) does not match TARGET_VER_PREFIX (${TARGET_VER_PREFIX})"
++    ERR=1
++    ;;
++  esac
++fi
++
+ # [ check configuration after the upgrade ]
+ # we check the debconf parameters
+ 

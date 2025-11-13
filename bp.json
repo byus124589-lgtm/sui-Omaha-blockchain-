@@ -1,0 +1,65 @@
+{
+    "producer_account_name": "eosauthority",
+    "org": {
+      "candidate_name": "EOS Authority",
+      "website": "https://eosauthority.com",
+      "email":"hello@eosauthority.com",
+      "github_user": "eosauthority",
+      "branding":{
+        "logo_256":"https://eosauthority.com/common/bp-standard-info/EOS-AUTHORITY-256.jpg",
+        "logo_1024":"https://eosauthority.com/common/bp-standard-info/EOS-AUTHORITY-1024.jpg",
+        "logo_svg":"https://eosauthority.com/common/bp-standard-info/eosauthority.svg"
+      },
+      "location": {
+        "name": "London",
+        "country": "GB",
+        "latitude": 51.512838,
+        "longitude": -0.087177
+      },
+      "social": {
+        "steemit": "eosauthority",
+        "twitter": "eosauthority",
+        "youtube": "eosauthority",
+        "facebook": "",
+        "github":"eosauthority",
+        "reddit": "eosauthority",
+        "keybase": "eosauthority",
+        "telegram": "eosauthority",
+        "wechat":"eosauthority"
+      }
+    },
+	"nodes": [{
+			"location": {
+				"name": "London",
+				"country": "GB",
+				"latitude": 51.512838,
+				"longitude": -0.087177
+			},
+			"node_type": "query",
+			"api_endpoint": "http://publicapi-mainnet.eosauthority.com",
+			"ssl_endpoint": "https://publicapi-mainnet.eosauthority.com",
+		    	"features": [
+            		"chain-api"
+			]
+		},
+      {
+        "location": {
+          "name": "London",
+          "country": "GB",
+          "latitude": 51.512838,
+          "longitude": -0.087177
+        },
+        "node_type": "seed",
+        "p2p_endpoint": "node869-mainnet.eosauthority.com:9393"
+      },      
+      {
+        "location": {
+          "name": "London",
+          "country": "GB",
+          "latitude": 51.512838,
+          "longitude": -0.087177
+        },
+        "node_type": "producer"
+      }
+    ]
+  }
